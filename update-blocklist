@@ -1,32 +1,34 @@
 #!/bin/python
 
 import os, glob
+import sys
 import requests
 from datetime import datetime as dt
 
-urls = [
-        "https://raw.githubusercontent.com/KnightmareVIIVIIXC/AIO-Firebog-Blocklists/main/dnsmasqlists/firebogsus.txt",
-#        "https://raw.githubusercontent.com/KnightmareVIIVIIXC/AIO-Firebog-Blocklists/main/dnsmasqlists/firebogad.txt",
-#        "https://raw.githubusercontent.com/KnightmareVIIVIIXC/AIO-Firebog-Blocklists/main/dnsmasqlists/firebogtrack.txt",
-        "https://raw.githubusercontent.com/KnightmareVIIVIIXC/AIO-Firebog-Blocklists/main/dnsmasqlists/firebogmal.txt"
-        ]
-all_lines = []
-temp_path = '/var/tmp/blocklist'
+# Add urls here
+urls = []
+
+# Application configuration
+line_prefix = 'local=/'
+line_postfix= '/\n'
+file_search_key = '*.txt'
+time_format = '%Y-%m-%d %H:%M:%S'
 out_file = 'blocklist.conf'
+temp_path = sys.argv[len(sys.argv) - 1]
+
+
+all_lines = []
 
 def pull_blocklists(save_path):
     for url in urls:
         try:
-            # Send a GET request to the URL
             response = requests.get(url)
 
-            # Raise an exception for bad responses
             response.raise_for_status()
 
-            # Open a file for writing
             save_file = os.path.join(save_path, url[url.rfind('/') + 1:])
+
             with open(save_file, 'wb') as f:
-                # Write the contents of the downloaded file
                 f.write(response.content)
 
         except requests.exceptions.HTTPError as errh:
@@ -41,21 +43,20 @@ def pull_blocklists(save_path):
 def distill_blocklists(filter):
     all_lines = []
     files = glob.glob(filter)
+
     for file in files:
         with open(file,'r') as file_in:
             all_lines = file_in.readlines()
-    return set(all_lines)
+
+    return set(all_lines), len(all_lines)
 
 def write_blocklist(out_file, contents):
     out_file.write("# suldev custom blocklist v0.1\n")
-    out_file.write(f"# Published: {dt.now().strftime("%Y-%m-%d %H:%M:%S")}\n")
+    out_file.write(f"# Published: {dt.now().strftime(time_format)}\n")
     out_file.write(f"# Unique Entries: {len(contents)}\n")
     for url in urls:
         out_file.writelines(f"# {url}\n")
     out_file.write("".join(sorted(contents, key=str.lower)))
-
-def is_line_valid(line) -> bool:
-    return line[:7] == 'local=/'
 
 def main():
     print(":: Warming up")
@@ -65,9 +66,14 @@ def main():
     pull_blocklists(temp_path)
 
     print(":: Distilling blocklists")
-    out_lines = distill_blocklists(os.path.join(temp_path, '*.txt'))
-    filtered_list = [s for s in out_lines if s.startswith('local=/')]
-
+    out_lines,all_lines_len = distill_blocklists(os.path.join(temp_path, file_search_key))
+    filtered_list = [s for s in out_lines if s.startswith(line_prefix)]
+    filtered_list = [s for s in filtered_list if s.endswith(line_postfix)]
+    line_set_len = len(filtered_list)
+    print(f" Total lines: {all_lines_len}")
+    print(f" Final lines: {line_set_len}")
+    print(f" Duplicates:  {all_lines_len - line_set_len}")
+    
     print(":: Cleaning up")
     with open(os.path.join(temp_path, out_file),'w') as file_out:
         write_blocklist(file_out, filtered_list)
