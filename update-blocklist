@@ -1,4 +1,4 @@
-#!/bin/python
+#!/bin/python3
 
 import os, glob
 import sys
@@ -6,7 +6,8 @@ import requests
 from datetime import datetime as dt
 
 # Add urls here
-urls = []
+block_lists = []
+white_list_urls = []
 
 # Application configuration
 line_prefix = 'local=/'
@@ -14,13 +15,16 @@ line_postfix= '/\n'
 file_search_key = '*.txt'
 time_format = '%Y-%m-%d %H:%M:%S'
 out_file = 'blocklist.conf'
-temp_path = sys.argv[len(sys.argv) - 1]
-
-
+if len(sys.argv) > 1:
+    temp_path = sys.argv[len(sys.argv) - 1]
+else:
+    temp_path = './'
+if temp_path.startswith('./'):
+    temp_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), temp_path[2:])
 all_lines = []
 
 def pull_blocklists(save_path):
-    for url in urls:
+    for url in block_lists:
         try:
             response = requests.get(url)
 
@@ -54,7 +58,7 @@ def write_blocklist(out_file, contents):
     out_file.write("# suldev custom blocklist v0.1\n")
     out_file.write(f"# Published: {dt.now().strftime(time_format)}\n")
     out_file.write(f"# Unique Entries: {len(contents)}\n")
-    for url in urls:
+    for url in block_lists:
         out_file.writelines(f"# {url}\n")
     out_file.write("".join(sorted(contents, key=str.lower)))
 
@@ -69,6 +73,7 @@ def main():
     out_lines,all_lines_len = distill_blocklists(os.path.join(temp_path, file_search_key))
     filtered_list = [s for s in out_lines if s.startswith(line_prefix)]
     filtered_list = [s for s in filtered_list if s.endswith(line_postfix)]
+    filtered_list = [s for s in filtered_list if not any(s == k for k in white_list_urls)]
     line_set_len = len(filtered_list)
     print(f" Total lines: {all_lines_len}")
     print(f" Final lines: {line_set_len}")
