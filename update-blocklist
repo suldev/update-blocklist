@@ -4,6 +4,7 @@ import os, glob
 import sys
 import requests
 from datetime import datetime as dt
+import argparse
 
 # Add urls here
 block_lists = []
@@ -15,6 +16,7 @@ line_postfix= '/\n'
 file_search_key = '*.txt'
 time_format = '%Y-%m-%d %H:%M:%S'
 out_file = 'blocklist.conf'
+
 if len(sys.argv) > 1:
     temp_path = sys.argv[len(sys.argv) - 1]
 else:
@@ -63,6 +65,25 @@ def write_blocklist(out_file, contents):
     out_file.write("".join(sorted(contents, key=str.lower)))
 
 def main():
+    # Handle arguments
+    parser = argparse.ArgumentParser(
+        prog='Update Blocklist',
+        description='Combines multiple blocklist files into a single dnsmasq configuration file',
+    )
+    parser.add_argument('path', help='Required. The working and output path')
+    parser.add_argument('-w','--whitelist', default=None, type=argparse.FileType('r'), metavar='FILE', help='Specify a line-by-line whitelist file. Matching lines will be commented out')
+    parser.add_argument('-W', default=None, type=argparse.FileType('r'), metavar='FILE', help='Specify a line-by-line whitelist file. Matching lines will be omitted')
+    parser.add_argument('-i','--install', default=False, action='store_true', help='Install the configuration file and restart dnsmasq')
+    args = parser.parse_args()
+
+    # Check whitelist
+    if args.whitelist is not None:
+        temp = args.whitelist.readlines()
+        for t in temp:
+            white_list_urls.append(t.rstrip())
+    print(args.install)
+    quit()
+
     print(":: Warming up")
     os.mkdir(temp_path)
 
