@@ -5,6 +5,7 @@ import sys
 import requests
 from datetime import datetime as dt
 import argparse
+import shutil
 
 # Add urls here
 block_lists = []
@@ -15,7 +16,6 @@ line_prefix = 'local=/'
 line_postfix= '/\n'
 file_search_key = '*.txt'
 time_format = '%Y-%m-%d %H:%M:%S'
-out_file = 'blocklist.conf'
 
 if len(sys.argv) > 1:
     temp_path = sys.argv[len(sys.argv) - 1]
@@ -46,7 +46,21 @@ def pull_blocklists(save_path):
         except requests.exceptions.RequestException as err:
             print(f"Other Error: {err}")
 
-def distill_blocklists(filter):
+def find_and_remove(url, lines, omit):
+    urls = []
+    output = []
+    for line in lines:
+        urls.append(line[len(line_prefix):-len(line_postfix)])
+    if url not in urls:
+        return lines
+    for i in range(len(urls)):
+        if urls[i] == url:
+            if not omit:
+                output.append("#" + lines[i])
+        else:
+            output.append(lines[i])
+
+def distill_blocklists(filter, omit):
     all_lines = []
     files = glob.glob(filter)
 
@@ -54,7 +68,11 @@ def distill_blocklists(filter):
         with open(file,'r') as file_in:
             all_lines = file_in.readlines()
 
-    return set(all_lines), len(all_lines)
+    unique_lines = set(all_lines)
+    for entry in white_list_urls:
+        sterilized_lines = find_and_remove(entry, unique_lines, omit)
+
+    return sterilized_lines, len(all_lines)
 
 def write_blocklist(out_file, contents):
     out_file.write("# suldev custom blocklist v0.1\n")
@@ -70,21 +88,37 @@ def main():
         prog='Update Blocklist',
         description='Combines multiple blocklist files into a single dnsmasq configuration file',
     )
+    wl_group = parser.add_argument_group('Whitelist', 'Provide a newline-separated list of urls to whitelist')
+    exclusive_group = wl_group.add_mutually_exclusive_group()
     parser.add_argument('path', help='Required. The working and output path')
-    parser.add_argument('-w','--whitelist', default=None, type=argparse.FileType('r'), metavar='FILE', help='Specify a line-by-line whitelist file. Matching lines will be commented out')
-    parser.add_argument('-W', default=None, type=argparse.FileType('r'), metavar='FILE', help='Specify a line-by-line whitelist file. Matching lines will be omitted')
-    parser.add_argument('-i','--install', default=False, action='store_true', help='Install the configuration file and restart dnsmasq')
+    parser.add_argument('-i', '--install', default=False, action='store_true', help='Install the configuration file and restart dnsmasq')
+    parser.add_argument('-o', '--output', default='blocklist.conf', help='Output file name. Defaults to blocklist.conf')
+    exclusive_group.add_argument('-w', default=None, type=argparse.FileType('r'), metavar='FILE', help='Matching lines will be commented out in the output file')
+    exclusive_group.add_argument('-W', default=None, type=argparse.FileType('r'), metavar='FILE', help='Matching lines will be omitted from the output file')
     args = parser.parse_args()
 
     # Check whitelist
-    if args.whitelist is not None:
-        temp = args.whitelist.readlines()
+    if args.w is not None and args.W is not None:
+        parser.print_help()
+        print('EE Attributes whitelist and W cannot be used in the same context')
+        quit()
+    if args.w is not None:
+        temp = args.w.readlines()
         for t in temp:
             white_list_urls.append(t.rstrip())
-    print(args.install)
-    quit()
+    omit = args.W is not None
+    if args.W is not None:
+        temp = args.W.readlines()
+        for t in temp:
+            white_list_urls.append(t.rstrip())
+    out_file = args.output
+    temp_path = args.path
+    print(temp_path)
 
     print(":: Warming up")
+    if os.path.exists(temp_path):
+        print('EE Temporary path already exists')
+        quit()
     os.mkdir(temp_path)
 
     print(":: Pulling blocklists")
@@ -101,7 +135,10 @@ def main():
     print(f" Duplicates:  {all_lines_len - line_set_len}")
     
     print(":: Cleaning up")
-    with open(os.path.join(temp_path, out_file),'w') as file_out:
+    temp_file = os.path.join(temp_path, out_file)
+    with open(temp_file,'w') as file_out:
         write_blocklist(file_out, filtered_list)
+    if args.install:
+        shutil.move(temp_file, )
         
 main()
