@@ -5,11 +5,13 @@ import requests
 from datetime import datetime as dt
 import argparse
 import shutil
+import subprocess as proc
 
-# Application configuration
+# Application static configuration
 line_prefix = 'local=/'
 line_postfix= '/\n'
 file_search_key = '*.txt'
+installation_path = '/etc/dnsmasq.d'
 
 def warmup(parser, args):
     # Check whitelist
@@ -47,7 +49,7 @@ def warmup(parser, args):
         print('WW Temporary path already exists')
     else:
         os.mkdir(temp_path)
-    return out_path, temp_path, time_format, whitelist_urls, block_lists, omit
+    return out_path, temp_path, time_format, whitelist_urls, set(block_lists), omit
 
 def pull_blocklists(blocklist_urls, save_path):
     for blocklist_url in blocklist_urls:
@@ -111,14 +113,15 @@ def main():
     # Handle arguments
     parser = argparse.ArgumentParser(
         prog='Update Blocklist',
-        description='Combines multiple blocklist files into a single dnsmasq configuration file',
+        description='Combines multiple blocklist files into a single dnsmasq configuration file. This program is limited to dnsmasq blocklists since 2.86'
     )
-    parser.add_argument('path', help='Required. The working and output path')
     parser.add_argument('blocklisturls', help='Required. New-line delimited list of urls. Use # for comments')
-    parser.add_argument('-i', '--install', default=False, action='store_true', help='Install the configuration file and restart dnsmasq')
+    parser.add_argument('path', help='Required. The working and output path')
+    parser.add_argument('-i', '--install', default=False, action='store_true', help='Install the configuration file and restart dnsmasq. Must be run as root.')
     parser.add_argument('-o', '--output', default='blocklist.conf', help='Output file name. Defaults to blocklist.conf')
     parser.add_argument('-T', default='%Y-%m-%d %H:%M:%S', metavar='FORMAT', help='Set the time stamp formatting using python standard strftime format')
     parser.add_argument('-l', '--local', default=False, action='store_true', help='Merge local blocklists')
+    parser.add_argument('-p', '--persist', default=False, action='store_true', help='Do not clean up the temporary files')
 
     wl_group = parser.add_argument_group('Whitelist', 'Provide a newline-separated list of urls to whitelist')
     exclusive_group = wl_group.add_mutually_exclusive_group()
@@ -127,12 +130,24 @@ def main():
 
     args = parser.parse_args()
 
+    if args.install:
+        import errno
+        try:
+            with open(os.path.join(installation_path, args.output), 'w'):
+                i = 0
+        except OSError as e:
+            if e.errno == 2:
+                print(f'FF Installation path {installation_path} does not exist.')
+            if e.errno == 13:
+                print('FF Installation requires sudo.')
+            quit()
+
     print(":: Warming up")
     out_path, temp_path, time_format, whitelist_urls, blocklist_urls, omit = warmup(parser, args)
 
-    print(":: Pulling blocklists")
-    if args.no_download == False:
-        pull_blocklists(temp_path, blocklist_urls)
+    if args.local == False:
+        print(":: Pulling blocklists")
+        pull_blocklists(blocklist_urls, temp_path)
 
     print(":: Distilling blocklists")
     distill_lines, all_lines_len, clean_lines_len, unique_urls_len, distill_lines_len = distill_blocklists(os.path.join(temp_path, file_search_key), whitelist_urls, omit)
@@ -146,5 +161,13 @@ def main():
     write_blocklist(distill_lines, out_path, time_format)
     if args.install:
         shutil.move(out_path, '/etc/dnsmasq.d/')
-        
-main()
+        test_proc = proc.run(['dnsmasq', f'--conf-file={out_path}', '--test'], capture_output=True, check=True)
+        if(test_proc.returncode != 0):
+            quit()
+        quit()
+        proc.run(['systemctl','restart','dnsmasq'])
+    if not args.persist:
+        shutil.rmtree(temp_path)
+
+if __name__ == '__main__':
+    main()
