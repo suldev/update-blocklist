@@ -11,7 +11,7 @@ import subprocess as proc
 line_prefix = 'local=/'
 line_postfix= '/\n'
 file_search_key = '*.txt'
-installation_path = '/etc/dnsmasq.d'
+installation_path = '/etc/dnsmasq.d/'
 
 def warmup(parser, args):
     # Check whitelist
@@ -160,11 +160,11 @@ def main():
     print(":: Cleaning up")
     write_blocklist(distill_lines, out_path, time_format)
     if args.install:
-        shutil.move(out_path, '/etc/dnsmasq.d/')
         test_proc = proc.run(['dnsmasq', f'--conf-file={out_path}', '--test'], capture_output=True, check=True)
         if(test_proc.returncode != 0):
             quit()
         quit()
+        shutil.move(out_path, installation_path)
         proc.run(['systemctl','restart','dnsmasq'])
     if not args.persist:
         shutil.rmtree(temp_path)
