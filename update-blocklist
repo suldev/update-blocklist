@@ -98,7 +98,8 @@ def distill_blocklists(file_collection, whitelist_urls, omit):
             else:
                 distilled_lines.append(line_prefix + sorted_url + line_postfix)
     else:
-        distilled_lines.append(line_prefix + sorted_url + line_postfix)
+        for sorted_url in sorted_urls:
+            distilled_lines.append(line_prefix + sorted_url + line_postfix)
     return distilled_lines, len(all_lines), len(clean_lines), len(sorted_urls), len(distilled_lines)
 
 def write_blocklist(blocklist, path, time_format):
