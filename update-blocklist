@@ -131,7 +131,7 @@ def main():
     parser.add_argument('-i', '--install', default=False, action='store_true', help='Install the configuration file and restart dnsmasq. Must be run as root.')
     parser.add_argument('-o', '--output', default='blocklist.conf', help='Output file name. Defaults to blocklist.conf')
     parser.add_argument('-T', default='%Y-%m-%d %H:%M:%S', metavar='FORMAT', help='Set the time stamp formatting using python standard strftime format')
-    parser.add_argument('-l', '--local', default=False, action='store_true', help='Merge local blocklists')
+    parser.add_argument('-l', '--local', default=False, action='store_true', help='Merge local blocklists. Assumes -p')
     parser.add_argument('-p', '--persist', default=False, action='store_true', help='Do not clean up the temporary files')
 
     wl_group = parser.add_argument_group('Whitelist', 'Provide a newline-separated list of urls to whitelist')
@@ -159,6 +159,8 @@ def main():
     if args.local == False:
         print(":: Pulling blocklists")
         pull_blocklists(blocklist_urls, temp_path)
+    else:
+        args.persist = True
 
     print(":: Distilling blocklists")
     distill_lines, all_lines_len, clean_lines_len, unique_urls_len, distill_lines_len = distill_blocklists(os.path.join(temp_path, file_search_key), whitelist_urls, omit)
