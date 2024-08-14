@@ -21,11 +21,11 @@ def warmup(parser, args):
         quit()
     block_lists = []
     try:
-        contents = []
+        lines = []
         with open(args.blocklisturls, 'r') as file:
-            contents = file.readlines()
-        for content in contents:
-            if(content[0] != '#'): block_lists.append(content.rstrip())
+            lines = file.readlines()
+        for line in lines:
+            if(line[0] != '#'): block_lists.append(line.rstrip())
     except FileNotFoundError:
         print('EE Url file ' + args.blocklisturls + ' is missing')
         quit()
@@ -72,6 +72,14 @@ def pull_blocklists(blocklist_urls, save_path):
         except requests.exceptions.RequestException as err:
             print(f"Other Error: {err}")
 
+from urllib.parse import urlparse
+def is_valid_url(url):
+    try:
+        result = urlparse(url)
+        return result.path != ''
+    except ValueError:
+        return False
+
 def distill_blocklists(file_collection, whitelist_urls, omit):
     all_lines = []
     clean_lines = []
@@ -86,7 +94,9 @@ def distill_blocklists(file_collection, whitelist_urls, omit):
     clean_lines = [s for s in clean_lines if s.endswith(line_postfix)]
     # Remove pre and post fixes
     for line in all_lines:
-        all_urls.append(line[len(line_prefix):-len(line_postfix)])
+        url = line[len(line_prefix):-len(line_postfix)]
+        if is_valid_url(url):
+            all_urls.append(url)
     set_urls = set(all_urls)
     sorted_urls = sorted(set_urls, key=str.lower)
     distilled_lines = []
