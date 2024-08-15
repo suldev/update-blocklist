@@ -180,6 +180,12 @@ def main():
             quit()
         print("succeeded")
         print(":: Installing")
+        if os.path.exists(installation_path):
+            if os.path.isfile(installation_path):
+                shutil.rmtree(installation_path)
+            else:
+                print(f"EE Specified installation destination exists, but wasn't a file: {installation_path}")
+                quit()
         shutil.move(out_path, installation_path)
         proc.run(['systemctl','restart','dnsmasq'])
     if args.install and not args.persist:
