@@ -170,17 +170,21 @@ def main():
     print(f"   Blacklist lines: {distill_lines_len}")
     print(f"   Removed lines:  {all_lines_len - distill_lines_len}")
     
-    print(":: Cleaning up")
+    print(":: Writing list")
     write_blocklist(distill_lines, out_path, time_format)
     if args.install:
+        print(":: Running dnsmasq test ", end='')
         test_proc = proc.run(['dnsmasq', f'--conf-file={out_path}', '--test'], capture_output=True, check=True)
         if(test_proc.returncode != 0):
+            print("failed")
             quit()
-        quit()
+        print("succeeded")
+        print(":: Installing")
         shutil.move(out_path, installation_path)
         proc.run(['systemctl','restart','dnsmasq'])
     if args.install and not args.persist:
         shutil.rmtree(temp_path)
+    print("done")
 
 if __name__ == '__main__':
     main()
