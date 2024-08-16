@@ -11,7 +11,7 @@ import subprocess as proc
 line_prefix = 'local=/'
 line_postfix= '/\n'
 file_search_key = '*.txt'
-installation_path = '/etc/dnsmasq.d/'
+dnsmasq_path = '/etc/dnsmasq.d/'
 
 def warmup(parser, args):
     # Check whitelist
@@ -140,11 +140,11 @@ def main():
     exclusive_group.add_argument('-W', default=None, type=argparse.FileType('r'), metavar='FILE', help='Matching lines will be omitted from the output file')
 
     args = parser.parse_args()
-
+    installation_path = os.path.join(dnsmasq_path, args.output)
     if args.install:
         import errno
         try:
-            with open(os.path.join(installation_path, args.output), 'w'):
+            with open(installation_path, 'w'):
                 i = 0
         except OSError as e:
             if e.errno == 2:
